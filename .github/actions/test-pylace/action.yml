@@ -11,8 +11,10 @@ runs:
 
     - name: Install pylace wheel
       shell: bash
-      run: uv pip install pylace --find-links ./dist --no-index
+      run: uv pip install pylace --find-links ../dist --no-index
+      working-directory: pylace
 
     - name: Run tests
       shell: bash
-      run: uv run pytest pylace/tests
+      run: uv run pytest tests
+      working-directory: pylace
