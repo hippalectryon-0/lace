@@ -29,12 +29,12 @@ jobs:
         with:
           python-version: '3.12'
           cache: 'pip'
-          cache-dependency-path: "pylace/requirements-lint.txt"
+          cache-dependency-path: "pylace/pyproject.toml"
 
       - name: Install Python dependencies
         run: |
           pip install --upgrade pip
-          pip install -r requirements-lint.txt
+          pip install ".[lint]"
 
       - name: Check format (black)
         run: black --check --diff .
@@ -98,6 +98,8 @@ jobs:
             3.10
             3.11
             3.12
+          cache: 'pip'
+          cache-dependency-path: "pylace/pyproject.toml"
 
       - name: Build wheels
         uses: PyO3/maturin-action@v1
@@ -110,7 +112,7 @@ jobs:
       - name: Install dev dependencies
         run: |
           pip install --upgrade pip
-          pip install -r pylace/requirements-dev.txt
+          pip install ".[dev]"
 
       - name: Install pylace
         run: |
@@ -144,6 +146,9 @@ jobs:
             3.11
             3.12
           architecture: ${{ matrix.target }}
+          cache: 'pip'
+          cache-dependency-path: "pylace/pyproject.toml"
+
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
@@ -154,7 +159,7 @@ jobs:
       - name: Install dev dependencies
         run: |
           pip install --upgrade pip
-          pip install -r pylace/requirements-dev.txt
+          pip install ".[dev]"
 
       - name: Install pylace
         run: |
@@ -191,6 +196,9 @@ jobs:
             3.10
             3.11
             3.12
+          cache: 'pip'
+          cache-dependency-path: "pylace/pyproject.toml"
+
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
@@ -201,7 +209,7 @@ jobs:
       - name: Install dev dependencies
         run: |
           pip install --upgrade pip
-          pip install -r pylace/requirements-dev.txt
+          pip install ".[dev]"
 
       - name: Install pylace
         run: |
@@ -243,6 +251,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: "pylace/pyproject.toml"
 
       - name: Install codedown
         run: npm install -g codedown

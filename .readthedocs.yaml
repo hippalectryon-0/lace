@@ -16,6 +16,7 @@ build:
 
 python:
   install:
-    - requirements: pylace/docs/requirements.txt
     - method: pip
       path: pylace
+      extra_requirements:
+        - docs
