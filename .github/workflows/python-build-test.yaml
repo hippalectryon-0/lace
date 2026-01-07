@@ -24,26 +24,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
         with:
-          python-version: '3.12'
-          cache: 'pip'
-          cache-dependency-path: "pylace/pyproject.toml"
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install -p 3.12
 
       - name: Install Python dependencies
-        run: |
-          pip install --upgrade pip
-          pip install ".[lint]"
+        run: uv sync --group lint
 
       - name: Check format (black)
-        run: black --check --diff .
+        run: uv run black --check --diff .
 
       - name: Lint Check (ruff)
-        run: ruff --diff .
+        run: uv run ruff --diff .
 
       - name: Check Minimum Supported Python Version (vermin)
-        run: vermin --target=3.8- --no-tips --violations .
+        run: uv run vermin --target=3.10- --no-tips --violations .
 
   lint-rust:
     runs-on: ubuntu-latest
@@ -90,38 +89,42 @@ jobs:
         target: [x86_64]
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          python-version: ${{ matrix.python-version }}
+
       - uses: actions/setup-python@v5
         with:
           python-version: |
-            3.8
-            3.9
             3.10
             3.11
             3.12
-          cache: 'pip'
-          cache-dependency-path: "pylace/pyproject.toml"
 
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
           maturin-version: 1.5.1
           target: ${{ matrix.target }}
-          args: --release --out dist -i python3.8 -i python3.9 -i python3.10 -i python3.11 -i python3.12 --manifest-path pylace/Cargo.toml
+          args: --release --out dist -i python3.10 -i python3.11 -i python3.12 --manifest-path pylace/Cargo.toml
           manylinux: auto
 
       - name: Install dev dependencies
         run: |
-          pip install --upgrade pip
-          pip install ".[dev]"
+          uv sync --group dev --no-install-project
+        working-directory: pylace
 
       - name: Install pylace
         run: |
-          WHEEL_FILE=$(python3 .github/scripts/find_compatible_wheel.py pylace ./dist)
+          WHEEL_FILE=$(uv run python3 .github/scripts/find_compatible_wheel.py pylace ./dist)
           echo "Installing $WHEEL_FILE"
-          pip install $WHEEL_FILE
+          uv pip install $WHEEL_FILE
+        working-directory: .
 
       - name: Run Tests
-        run: pytest pylace/tests
+        run: uv run pytest pylace/tests
 
       - name: Upload wheels
         uses: actions/upload-artifact@v4
@@ -137,38 +140,41 @@ jobs:
         target: [x64]
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          python-version: ${{ matrix.python-version }}
+
       - uses: actions/setup-python@v5
         with:
           python-version: |
-            3.8
-            3.9
             3.10
             3.11
             3.12
           architecture: ${{ matrix.target }}
-          cache: 'pip'
-          cache-dependency-path: "pylace/pyproject.toml"
 
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
           maturin-version: 1.5.1
           target: ${{ matrix.target }}
-          args: --release --out dist -i python3.8 -i python3.9 -i python3.10 -i python3.11 -i python3.12 --manifest-path pylace/Cargo.toml
+          args: --release --out dist -i python3.10 -i python3.11 -i python3.12 --manifest-path pylace/Cargo.toml
 
       - name: Install dev dependencies
         run: |
-          pip install --upgrade pip
-          pip install ".[dev]"
+          uv sync --group dev --no-install-project
+        working-directory: pylace
 
       - name: Install pylace
         run: |
-          $WHEEL_FILE = (python3 .github/scripts/find_compatible_wheel.py pylace ./dist)
+          $WHEEL_FILE = (uv run python .github/scripts/find_compatible_wheel.py pylace ./dist)
           echo "Installing $WHEEL_FILE"
-          pip install $WHEEL_FILE
+          uv pip install $WHEEL_FILE
 
       - name: Run Tests
-        run: pytest pylace/tests
+        run: uv run pytest pylace/tests
 
       - name: Upload wheels
         uses: actions/upload-artifact@v4
@@ -188,37 +194,40 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          python-version: ${{ matrix.python-version }}
+
       - uses: actions/setup-python@v5
         with:
           python-version: |
-            3.8
-            3.9
             3.10
             3.11
             3.12
-          cache: 'pip'
-          cache-dependency-path: "pylace/pyproject.toml"
 
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
           maturin-version: 1.5.1
           target: ${{ matrix.target }}
-          args: --release --out dist -i python3.8 -i python3.9 -i python3.10 -i python3.11 -i python3.12 --manifest-path pylace/Cargo.toml
+          args: --release --out dist -i python3.10 -i python3.11 -i python3.12 --manifest-path pylace/Cargo.toml
 
       - name: Install dev dependencies
         run: |
-          pip install --upgrade pip
-          pip install ".[dev]"
+          uv sync --group dev --no-install-project
+        working-directory: pylace
 
       - name: Install pylace
         run: |
-          WHEEL_FILE=$(python3 .github/scripts/find_compatible_wheel.py pylace ./dist)
+          WHEEL_FILE=$(uv run python .github/scripts/find_compatible_wheel.py pylace ./dist)
           echo "Installing $WHEEL_FILE"
-          pip install $WHEEL_FILE
+          uv pip install $WHEEL_FILE
 
       - name: Run Tests
-        run: pytest pylace/tests
+        run: uv run pytest pylace/tests
 
       - name: Upload wheels
         uses: actions/upload-artifact@v4
@@ -243,6 +252,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          python-version: ${{ matrix.python-version }}
+
       - uses: actions/download-artifact@v4
         with:
           name: wheels
@@ -251,26 +266,24 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-          cache: 'pip'
-          cache-dependency-path: "pylace/pyproject.toml"
 
       - name: Install codedown
         run: npm install -g codedown
 
       - name: Install Wheel
         run: |
-          pip install packaging
-          WHEEL_FILE=$(python3 .github/scripts/find_compatible_wheel.py pylace ./dist)
+          uv pip install packaging
+          WHEEL_FILE=$(uv run python .github/scripts/find_compatible_wheel.py pylace ./dist)
           echo "Installing $WHEEL_FILE"
-          pip install $WHEEL_FILE
+          uv pip install $WHEEL_FILE
 
       - name: Test MDBook Code Samples (Python)
         env:
           FORCE_COLOR: 1
         run: |
-          pip install termcolor yq
-          NEW_VERSION=$(tomlq -r .package.version < pylace/Cargo.toml)
-          python3 .github/scripts/run_code_in_mdfile.py directory python book $NEW_VERSION --exclusion-file .github/resources/mdbook_exclusions.txt
+          uv pip install termcolor yq
+          NEW_VERSION=$(uv run tomlq -r .package.version < pylace/Cargo.toml)
+          uv run python .github/scripts/run_code_in_mdfile.py directory python book $NEW_VERSION --exclusion-file .github/resources/mdbook_exclusions.txt
 
   test-mdbook-build:
     name: Test MDBook Building
@@ -314,6 +327,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
       - name: Check Branch
         env:
           NEW_VERSION: ${{github.ref_name}}
@@ -325,10 +340,10 @@ jobs:
         env:
           NEW_VERSION: ${{github.ref_name}}
         run: |
-          pip install yq
+          uv pip install yq
           DEPLOYING_VERSION=$(echo "$NEW_VERSION" | perl -lpe 's/^python-//')
-          find . -name Cargo.toml -exec tomlq -r .package.version {} \; | xargs -n 1 test "$DEPLOYING_VERSION" =
-          find . -name pyproject.toml   -exec tomlq -r .project.version {} \; | xargs -n 1 test "$DEPLOYING_VERSION" =
+          find . -name Cargo.toml -exec uv run tomlq -r .package.version {} \; | xargs -n 1 test "$DEPLOYING_VERSION" =
+          find . -name pyproject.toml   -exec uv run tomlq -r .project.version {} \; | xargs -n 1 test "$DEPLOYING_VERSION" =
       - uses: actions/download-artifact@v4
         id: download-wheels
         with:
