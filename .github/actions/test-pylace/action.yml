@@ -1,0 +1,30 @@
+name: 'Test pylace'
+description: 'Install pylace wheel and run tests'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install dev dependencies
+      shell: bash
+      working-directory: pylace
+      run: uv sync --group dev --no-install-project
+
+    - name: Find and install pylace wheel (Unix)
+      if: runner.os != 'Windows'
+      shell: bash
+      run: |
+        WHEEL_FILE=$(uv run python .github/scripts/find_compatible_wheel.py pylace ./dist)
+        echo "Installing $WHEEL_FILE"
+        uv pip install "$WHEEL_FILE"
+
+    - name: Find and install pylace wheel (Windows)
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        $WHEEL_FILE = (uv run python .github/scripts/find_compatible_wheel.py pylace ./dist)
+        echo "Installing $WHEEL_FILE"
+        uv pip install $WHEEL_FILE
+
+    - name: Run tests
+      shell: bash
+      run: uv run pytest pylace/tests

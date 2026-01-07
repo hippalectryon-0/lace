@@ -1,0 +1,19 @@
+name: 'Setup Python with uv'
+description: 'Install uv and set up multiple Python versions'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install uv
+      uses: astral-sh/setup-uv@v7
+      with:
+        enable-cache: true
+
+    - name: Setup Python versions
+      uses: actions/setup-python@v5
+      with:
+        python-version: |
+          3.10
+          3.11
+          3.12
+        architecture: ${{ runner.os == 'Windows' && 'x64' || '' }}

@@ -29,11 +29,8 @@ jobs:
         with:
           enable-cache: true
 
-      - name: Set up Python
-        run: uv python install -p 3.12
-
       - name: Install Python dependencies
-        run: uv sync --group lint
+        run: uv sync -p 3.12 --group lint
 
       - name: Check format (black)
         run: uv run black --check --diff .
@@ -69,8 +66,7 @@ jobs:
       - name: Run clippy
         env:
           RUSTFLAGS: -C debuginfo=0  # Do not produce debug symbols to keep memory usage down
-        run : |
-          cargo clippy
+        run: cargo clippy
       - name: Install audit
         run: cargo install cargo-audit
       - name: Run audit
@@ -81,132 +77,38 @@ jobs:
         #       and thus neither `polars` or `arrow2` can pass `audit` checks
         run: cargo audit -f Cargo.lock --ignore RUSTSEC-2020-0071
 
-  linux:
-    runs-on: ubuntu-latest
+  build-and-test:
+    runs-on: ${{ matrix.os }}
     needs: ["lint-python", "lint-rust"]
     strategy:
-      matrix:
-        target: [x86_64]
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
-          python-version: ${{ matrix.python-version }}
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: |
-            3.10
-            3.11
-            3.12
-
-      - name: Build wheels
-        uses: PyO3/maturin-action@v1
-        with:
-          maturin-version: 1.5.1
-          target: ${{ matrix.target }}
-          args: --release --out dist -i python3.10 -i python3.11 -i python3.12 --manifest-path pylace/Cargo.toml
-          manylinux: auto
-
-      - name: Install dev dependencies
-        run: |
-          uv sync --group dev --no-install-project
-        working-directory: pylace
-
-      - name: Install pylace
-        run: |
-          WHEEL_FILE=$(uv run python3 .github/scripts/find_compatible_wheel.py pylace ./dist)
-          echo "Installing $WHEEL_FILE"
-          uv pip install $WHEEL_FILE
-        working-directory: .
-
-      - name: Run Tests
-        run: uv run pytest pylace/tests
-
-      - name: Upload wheels
-        uses: actions/upload-artifact@v4
-        with:
-          name: wheels-linux-${{ matrix.target }}
-          path: dist
-
-  windows:
-    runs-on: windows-latest
-    needs: ["lint-python", "lint-rust"]
-    strategy:
-      matrix:
-        target: [x64]
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
-          python-version: ${{ matrix.python-version }}
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: |
-            3.10
-            3.11
-            3.12
-          architecture: ${{ matrix.target }}
-
-      - name: Build wheels
-        uses: PyO3/maturin-action@v1
-        with:
-          maturin-version: 1.5.1
-          target: ${{ matrix.target }}
-          args: --release --out dist -i python3.10 -i python3.11 -i python3.12 --manifest-path pylace/Cargo.toml
-
-      - name: Install dev dependencies
-        run: |
-          uv sync --group dev --no-install-project
-        working-directory: pylace
-
-      - name: Install pylace
-        run: |
-          $WHEEL_FILE = (uv run python .github/scripts/find_compatible_wheel.py pylace ./dist)
-          echo "Installing $WHEEL_FILE"
-          uv pip install $WHEEL_FILE
-
-      - name: Run Tests
-        run: uv run pytest pylace/tests
-
-      - name: Upload wheels
-        uses: actions/upload-artifact@v4
-        with:
-          name: wheels-windows-${{ matrix.target }}
-          path: dist
-
-  macos:
-    needs: ["lint-python", "lint-rust"]
-    strategy:
+      fail-fast: false
       matrix:
         include:
-          - os: macos-latest
-            target: aarch64
+          # Linux
+          - os: ubuntu-latest
+            target: x86_64
+            platform: linux
+
+          # Windows
+          - os: windows-latest
+            target: x64
+            platform: windows
+
+          # macOS Intel
           - os: macos-13
             target: x86_64
-    runs-on: ${{ matrix.os }}
+            platform: macos
+
+          # macOS Apple Silicon
+          - os: macos-latest
+            target: aarch64
+            platform: macos
+
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
-          python-version: ${{ matrix.python-version }}
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: |
-            3.10
-            3.11
-            3.12
+      - name: Setup Python and uv
+        uses: ./.github/actions/setup-python-uv
 
       - name: Build wheels
         uses: PyO3/maturin-action@v1
@@ -214,30 +116,20 @@ jobs:
           maturin-version: 1.5.1
           target: ${{ matrix.target }}
           args: --release --out dist -i python3.10 -i python3.11 -i python3.12 --manifest-path pylace/Cargo.toml
+          manylinux: ${{ matrix.platform == 'linux' && 'auto' || '' }}
 
-      - name: Install dev dependencies
-        run: |
-          uv sync --group dev --no-install-project
-        working-directory: pylace
-
-      - name: Install pylace
-        run: |
-          WHEEL_FILE=$(uv run python .github/scripts/find_compatible_wheel.py pylace ./dist)
-          echo "Installing $WHEEL_FILE"
-          uv pip install $WHEEL_FILE
-
-      - name: Run Tests
-        run: uv run pytest pylace/tests
+      - name: Test pylace
+        uses: ./.github/actions/test-pylace
 
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-macos-${{ matrix.target }}
+          name: wheels-${{ matrix.platform }}-${{ matrix.target }}
           path: dist
 
   merge:
     runs-on: ubuntu-latest
-    needs: [ macos, windows, linux ]
+    needs: [build-and-test]
     steps:
       - name: Merge Artifacts
         uses: actions/upload-artifact/merge@v4
@@ -256,7 +148,6 @@ jobs:
         uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
-          python-version: ${{ matrix.python-version }}
 
       - uses: actions/download-artifact@v4
         with:
@@ -270,18 +161,18 @@ jobs:
       - name: Install codedown
         run: npm install -g codedown
 
-      - name: Install Wheel
+      - name: Install dependencies and wheel
         run: |
           uv pip install packaging
           WHEEL_FILE=$(uv run python .github/scripts/find_compatible_wheel.py pylace ./dist)
           echo "Installing $WHEEL_FILE"
-          uv pip install $WHEEL_FILE
+          uv pip install "$WHEEL_FILE"
+          uv pip install termcolor yq
 
       - name: Test MDBook Code Samples (Python)
         env:
           FORCE_COLOR: 1
         run: |
-          uv pip install termcolor yq
           NEW_VERSION=$(uv run tomlq -r .package.version < pylace/Cargo.toml)
           uv run python .github/scripts/run_code_in_mdfile.py directory python book $NEW_VERSION --exclusion-file .github/resources/mdbook_exclusions.txt
 
@@ -294,8 +185,6 @@ jobs:
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
 
       - name: Cache Rust
         uses: Swatinem/rust-cache@v2
@@ -304,12 +193,10 @@ jobs:
 
       - name: Install preprocessor
         working-directory: book/lace_preprocess_mdbook_yaml
-        run: |
-          cargo install --bins --locked --path .
+        run: cargo install --bins --locked --path .
 
       - name: Install mdBook
-        run: |
-          cargo install mdbook --version ^0.4
+        run: cargo install mdbook --version ^0.4
 
       - name: Configure the book in test mode and build
         working-directory: book
@@ -329,21 +216,35 @@ jobs:
           fetch-depth: 0
       - name: Install uv
         uses: astral-sh/setup-uv@v7
-      - name: Check Branch
+
+      - name: Validate release
         env:
-          NEW_VERSION: ${{github.ref_name}}
+          NEW_VERSION: ${{ github.ref_name }}
         run: |
           git fetch origin master
-          git tag --merged origin/master | grep $NEW_VERSION
-      - name: Check Semver
-        working-directory: pylace
-        env:
-          NEW_VERSION: ${{github.ref_name}}
-        run: |
-          uv pip install yq
-          DEPLOYING_VERSION=$(echo "$NEW_VERSION" | perl -lpe 's/^python-//')
-          find . -name Cargo.toml -exec uv run tomlq -r .package.version {} \; | xargs -n 1 test "$DEPLOYING_VERSION" =
-          find . -name pyproject.toml   -exec uv run tomlq -r .project.version {} \; | xargs -n 1 test "$DEPLOYING_VERSION" =
+          if ! git tag --merged origin/master | grep -q "$NEW_VERSION"; then
+            echo "Error: Tag $NEW_VERSION is not merged into master"
+            exit 1
+          fi
+          
+          # Validate version matches in all config files
+          DEPLOYING_VERSION=$(echo "$NEW_VERSION" | sed 's/^python-//')
+          echo "Validating version: $DEPLOYING_VERSION"
+          
+          cd pylace
+          CARGO_VERSION=$(uv run tomlq -r .package.version Cargo.toml)
+          PYPROJECT_VERSION=$(uv run tomlq -r .project.version pyproject.toml)
+          
+          if [ "$CARGO_VERSION" != "$DEPLOYING_VERSION" ] || [ "$PYPROJECT_VERSION" != "$DEPLOYING_VERSION" ]; then
+            echo "Error: Version mismatch!"
+            echo "  Tag version: $DEPLOYING_VERSION"
+            echo "  Cargo.toml:  $CARGO_VERSION"
+            echo "  pyproject.toml: $PYPROJECT_VERSION"
+            exit 1
+          fi
+          
+          echo "Version validation passed: $DEPLOYING_VERSION"
+
       - uses: actions/download-artifact@v4
         id: download-wheels
         with:
