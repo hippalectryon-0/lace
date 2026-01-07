@@ -9,21 +9,9 @@ runs:
       working-directory: pylace
       run: uv sync --group dev --no-install-project
 
-    - name: Find and install pylace wheel (Unix)
-      if: runner.os != 'Windows'
+    - name: Install pylace wheel
       shell: bash
-      run: |
-        WHEEL_FILE=$(uv run python .github/scripts/find_compatible_wheel.py pylace ./dist)
-        echo "Installing $WHEEL_FILE"
-        uv pip install "$WHEEL_FILE"
-
-    - name: Find and install pylace wheel (Windows)
-      if: runner.os == 'Windows'
-      shell: pwsh
-      run: |
-        $WHEEL_FILE = (uv run python .github/scripts/find_compatible_wheel.py pylace ./dist)
-        echo "Installing $WHEEL_FILE"
-        uv pip install $WHEEL_FILE
+      run: uv pip install pylace --find-links ./dist --no-index
 
     - name: Run tests
       shell: bash
